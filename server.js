@@ -15,22 +15,30 @@ const io = new Server(server, {
 
 let canvasState = [];
 
-// Enable CORS for all HTTP requests
-app.use(cors({
-  origin: 'http://localhost:3000', // Allow requests from frontend
-  methods: ['GET', 'POST'],
-  allowedHeaders: ['Content-Type'],
-}));
-
-// Serve React static files
 app.use(express.static(path.join(__dirname, 'frontend', 'build')));
 
-// Handle Socket.IO connections
-io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id);
+wss.on('connection', (ws) => {
+  console.log('Client connected');
 
-  // Send existing canvas state to the new client
-  socket.emit('INITIAL_STATE', canvasState);
+  ws.on('message', (message) => {
+    console.log('Message received:', message);
+
+  
+    wss.clients.forEach((client) => {
+      if (client !== ws && client.readyState === 1) {
+        client.send(message);
+      }
+    });
+  });
+
+  ws.on('close', () => {
+    console.log('Client disconnected');
+  });
+
+
+
+  
+  ws.send(JSON.stringify({ type: 'INITIAL_STATE', canvasState }));
 
   // Handle incoming draw events
   socket.on('DRAW', (data) => {
@@ -49,12 +57,11 @@ io.on('connection', (socket) => {
   });
 });
 
-// Serve the React app for all other routes
+
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'frontend', 'build', 'index.html'));
 });
 
-// Start the server
 const PORT = 4000;
 server.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
